@@ -226,6 +226,8 @@ typedef struct WaitExitOptions
     Dart_Port port;
 
     HANDLE hMutex;
+
+    HPCON hPty;
 } WaitExitOptions;
 
 static DWORD WINAPI wait_exit_thread(LPVOID arg)
@@ -240,19 +242,21 @@ static DWORD WINAPI wait_exit_thread(LPVOID arg)
 
     CloseHandle(options->pid);
     CloseHandle(options->hMutex);
+    ClosePseudoConsole(options->hPty);
 
     Dart_PostInteger_DL(options->port, exit_code);
 
     return 0;
 }
 
-static void start_wait_exit_thread(HANDLE pid, Dart_Port port, HANDLE mutex)
+static void start_wait_exit_thread(HANDLE pid, Dart_Port port, HANDLE mutex, HPCON hPty)
 {
     WaitExitOptions *options = malloc(sizeof(WaitExitOptions));
 
     options->pid = pid;
     options->port = port;
     options->hMutex = mutex;
+    options->hPty = hPty;
 
     DWORD thread_id;
 
@@ -410,7 +414,7 @@ FFI_PLUGIN_EXPORT PtyHandle *pty_create(PtyOptions *options)
 
     start_read_thread(outputReadSide, options->stdout_port, mutex, options->ackRead);
 
-    start_wait_exit_thread(processInfo.hProcess, options->exit_port, mutex);
+    start_wait_exit_thread(processInfo.hProcess, options->exit_port, mutex, hPty);
 
     PtyHandle *pty = malloc(sizeof(PtyHandle));
 
